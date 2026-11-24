@@ -14,10 +14,10 @@ migrate = Migrate()
 csrf = CSRFProtect()
 
 
-def _database_url():
-    url = os.environ.get("DATABASE_URL", "sqlite:///wonton_pos.db").strip()
-    # Railway may provide postgres:// or postgresql:// URLs. psycopg 3 is the
-    # explicit SQLAlchemy driver used in production.
+def _database_url(raw_url=None):
+    url = (raw_url or os.environ.get("DATABASE_URL") or "sqlite:///wonton_pos.db").strip()
+    # Cloud providers may provide postgres:// or postgresql:// URLs.
+    # psycopg 3 is the explicit SQLAlchemy driver used in production.
     if url.startswith("postgres://"):
         url = "postgresql://" + url[len("postgres://"):]
     if url.startswith("postgresql://"):
@@ -27,16 +27,33 @@ def _database_url():
 
 def create_app(test_config=None):
     app = Flask(__name__, template_folder="../templates", static_folder="../static")
-    is_production = os.environ.get("RAILWAY_ENVIRONMENT") is not None or os.environ.get("FLASK_ENV", "").lower() == "production"
+    is_production = (
+        os.environ.get("VERCEL") == "1"
+        or os.environ.get("FLASK_ENV", "").lower() == "production"
+    )
 
     secret_key = os.environ.get("SECRET_KEY")
-    if not secret_key and is_production and not (test_config and test_config.get("TESTING")):
-        raise RuntimeError("SECRET_KEY wajib diatur pada environment production.")
+    raw_database_url = os.environ.get("DATABASE_URL")
+    if is_production and not (test_config and test_config.get("TESTING")):
+        if not secret_key:
+            raise RuntimeError("SECRET_KEY wajib diatur pada Environment Variables production.")
+        if not raw_database_url:
+            raise RuntimeError("DATABASE_URL wajib diatur ke PostgreSQL cloud pada production.")
+    database_url = _database_url(raw_database_url)
+    if is_production and database_url.startswith("sqlite:") and not (test_config and test_config.get("TESTING")):
+        raise RuntimeError("SQLite tidak boleh digunakan sebagai database production.")
+
+    engine_options = {"pool_pre_ping": True}
+    if database_url.startswith(("postgresql://", "postgresql+psycopg://")):
+        # Each warm serverless instance keeps at most one DB connection.
+        # Use Neon's pooled (-pooler) hostname for request traffic.
+        engine_options.update(pool_size=5, max_overflow=0, pool_recycle=300, pool_timeout=10)
+
     app.config.update(
         SECRET_KEY=secret_key or "local-development-only-change-me",
-        SQLALCHEMY_DATABASE_URI=_database_url(),
+        SQLALCHEMY_DATABASE_URI=database_url,
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
-        SQLALCHEMY_ENGINE_OPTIONS={"pool_pre_ping": True},
+        SQLALCHEMY_ENGINE_OPTIONS=engine_options,
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SECURE=is_production,
         SESSION_COOKIE_SAMESITE="Lax",

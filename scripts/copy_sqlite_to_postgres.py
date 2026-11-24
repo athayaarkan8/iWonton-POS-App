@@ -1,6 +1,6 @@
 """Copy existing Stage 7 SQLite records into an empty PostgreSQL database.
 
-Set DATABASE_URL to the Railway PostgreSQL URL and SQLITE_DATABASE_URL to the
+Set DATABASE_URL to the Neon PostgreSQL URL and SQLITE_DATABASE_URL to the
 local SQLite URL. Back up both databases before running this one-time utility.
 """
 import os

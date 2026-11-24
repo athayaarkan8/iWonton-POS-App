@@ -11,3 +11,10 @@ instance/
 htmlcov/
 *.log
 .DS_Store
+
+# Database backups
+*.dump
+*.sql
+
+# Vercel local project metadata
+.vercel/

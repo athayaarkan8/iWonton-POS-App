@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Manajemen Pengguna · Wonton POS{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><p class="eyebrow">ADMIN · PENGATURAN</p><h1 class="page-title">Manajemen Pengguna</h1>
+  <p class="text-muted mb-0">Kelola akun Admin, Kasir, dan Produksi. Total {{ pagination.total }} akun.</p></div>
+  <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#createUserModal">+ Tambah Pengguna</button>
+</div>
+<form method="get" class="chart-card mb-3 row g-2 align-items-end">
+  <div class="col-12 col-md-5"><label class="form-label small mb-1">Cari nama atau username</label><input class="form-control" name="q" value="{{ q }}" placeholder="Masukkan nama / username"></div>
+  <div class="col-6 col-md-3"><label class="form-label small mb-1">Role</label><select class="form-select" name="role">
+    <option value="">Semua role</option><option value="admin" {{ 'selected' if role=='admin' }}>Admin</option><option value="kasir" {{ 'selected' if role=='kasir' }}>Kasir</option><option value="produksi" {{ 'selected' if role=='produksi' }}>Produksi</option>
+  </select></div>
+  <div class="col-6 col-md-2"><label class="form-label small mb-1">Status akun</label><select class="form-select" name="status">
+    <option value="">Semua status</option><option value="active" {{ 'selected' if status=='active' }}>Aktif</option><option value="inactive" {{ 'selected' if status=='inactive' }}>Nonaktif</option>
+  </select></div>
+  <div class="col-12 col-md-2 d-flex gap-2"><button class="btn btn-primary flex-grow-1">Filter</button><a class="btn btn-outline-secondary" href="{{ url_for('users.index') }}">Reset</a></div>
+</form>
+<div class="soft-table"><div class="table-responsive"><table class="table table-hover align-middle">
+<thead><tr><th>Pengguna</th><th>Username</th><th>Role</th><th>Status</th><th>Dibuat</th><th class="text-end">Aksi</th></tr></thead><tbody>
+{% for user in pagination.items %}
+<tr>
+<td><div class="fw-bold">{{ user.display_name }}</div>{% if user.id==current_user.id %}<span class="small text-muted">Akun yang sedang digunakan</span>{% endif %}</td>
+<td><code>{{ user.username }}</code></td>
+<td><span class="badge role-badge role-{{ user.role }}">{{ user.role|title }}</span></td>
+<td><span class="badge {{ 'bg-success-subtle text-success' if user.is_active else 'bg-secondary-subtle text-secondary' }}">{{ 'Aktif' if user.is_active else 'Nonaktif' }}</span></td>
+<td class="small text-muted">{{ user.created_at.strftime('%d/%m/%Y') if user.created_at else '-' }}</td>
+<td><div class="d-flex justify-content-end flex-wrap gap-1">
+<button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#edit{{ user.id }}">Edit</button>
+<button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#reset{{ user.id }}">Reset password</button>
+{% if user.is_active %}
+<form method="post" action="{{ url_for('users.toggle_status',user_id=user.id) }}" onsubmit="return confirm('Nonaktifkan akun {{ user.username }}? Pengguna tidak akan dapat login, tetapi riwayat transaksi tetap tersimpan.');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="user_admin_csrf_token" value="{{ user_admin_csrf_token }}"><button class="btn btn-sm btn-outline-secondary" {{ 'disabled' if user.id==current_user.id }}>Nonaktifkan</button></form>
+{% else %}
+<form method="post" action="{{ url_for('users.toggle_status',user_id=user.id) }}" onsubmit="return confirm('Aktifkan kembali akun {{ user.username }}?');"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="user_admin_csrf_token" value="{{ user_admin_csrf_token }}"><button class="btn btn-sm btn-outline-success">Aktifkan</button></form>
+{% endif %}
+</div></td></tr>
+{% else %}<tr><td colspan="6"><div class="empty-state my-3"><h5 class="fw-bold">Belum ada pengguna</h5><p class="mb-0">Tidak ada akun yang cocok dengan pencarian dan filter ini.</p></div></td></tr>{% endfor %}
+</tbody></table></div></div>
+{% if pagination.pages > 1 %}<nav class="mt-3 d-flex justify-content-between align-items-center"><span class="small text-muted">Halaman {{ pagination.page }} dari {{ pagination.pages }}</span><div class="d-flex gap-2">
+{% if pagination.has_prev %}<a class="btn btn-sm btn-outline-danger" href="{{ url_for('users.index',page=pagination.prev_num,q=q,role=role,status=status) }}">← Sebelumnya</a>{% endif %}
+{% if pagination.has_next %}<a class="btn btn-sm btn-outline-danger" href="{{ url_for('users.index',page=pagination.next_num,q=q,role=role,status=status) }}">Berikutnya →</a>{% endif %}
+</div></nav>{% endif %}
+
+{% for user in pagination.items %}
+<div class="modal fade" id="edit{{ user.id }}" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="post" action="{{ url_for('users.edit',user_id=user.id) }}" {% if user.is_active and user.id!=current_user.id %}onsubmit="return document.getElementById('edit-status-{{ user.id }}').value !== '0' || confirm('Nonaktifkan akun {{ user.username }}? Pengguna tidak akan dapat login, tetapi riwayat transaksi tetap tersimpan.');"{% endif %}><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="modal-header"><h5 class="modal-title">Edit akun · {{ user.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body"><input type="hidden" name="user_admin_csrf_token" value="{{ user_admin_csrf_token }}">
+<div class="mb-3"><label class="form-label">Nama lengkap</label><input class="form-control" name="display_name" maxlength="120" value="{{ user.display_name }}" required></div>
+<div class="mb-3"><label class="form-label">Username</label><input class="form-control" name="username" minlength="3" maxlength="30" value="{{ user.username }}" required></div>
+<div class="mb-3"><label class="form-label">Role</label><select class="form-select" name="role" required><option value="admin" {{ 'selected' if user.role=='admin' }}>Admin</option><option value="kasir" {{ 'selected' if user.role=='kasir' }}>Kasir</option><option value="produksi" {{ 'selected' if user.role=='produksi' }}>Produksi</option></select></div>
+<div><label class="form-label">Status akun</label><select id="edit-status-{{ user.id }}" class="form-select" name="is_active" required><option value="1" {{ 'selected' if user.is_active }}>Aktif</option><option value="0" {{ 'selected' if not user.is_active }}>Nonaktif</option></select></div>
+<p class="small text-muted mt-3 mb-0">Password tidak ditampilkan atau diubah melalui form ini. Gunakan Reset Password.</p></div>
+<div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary">Simpan perubahan</button></div>
+</form></div></div></div>
+<div class="modal fade" id="reset{{ user.id }}" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="post" action="{{ url_for('users.reset_password',user_id=user.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="modal-header"><h5 class="modal-title">Reset password · {{ user.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body"><input type="hidden" name="user_admin_csrf_token" value="{{ user_admin_csrf_token }}">
+<div class="mb-3"><label class="form-label">Password baru</label><input type="password" class="form-control" name="password" minlength="8" autocomplete="new-password" required></div>
+<div><label class="form-label">Konfirmasi password baru</label><input type="password" class="form-control" name="confirm_password" minlength="8" autocomplete="new-password" required></div>
+<p class="small text-muted mt-3 mb-0">Minimal 8 karakter serta mengandung huruf dan angka.</p></div>
+<div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary">Reset password</button></div>
+</form></div></div></div>
+{% endfor %}
+
+<div class="modal fade" id="createUserModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="post" action="{{ url_for('users.create') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+<div class="modal-header"><h5 class="modal-title">Tambah pengguna</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+<div class="modal-body"><input type="hidden" name="user_admin_csrf_token" value="{{ user_admin_csrf_token }}">
+<div class="mb-3"><label class="form-label">Nama lengkap</label><input class="form-control" name="display_name" maxlength="120" required></div>
+<div class="mb-3"><label class="form-label">Username</label><input class="form-control" name="username" minlength="3" maxlength="30" autocomplete="username" required><div class="form-text">3–30 karakter: huruf, angka, titik, garis bawah, atau tanda hubung.</div></div>
+<div class="mb-3"><label class="form-label">Role</label><select class="form-select" name="role" required><option value="kasir">Kasir</option><option value="produksi">Produksi</option><option value="admin">Admin</option></select></div>
+<div class="mb-3"><label class="form-label">Password</label><input type="password" class="form-control" name="password" minlength="8" autocomplete="new-password" required></div>
+<div><label class="form-label">Konfirmasi password</label><input type="password" class="form-control" name="confirm_password" minlength="8" autocomplete="new-password" required></div>
+<p class="small text-muted mt-3 mb-0">Password minimal 8 karakter serta mengandung huruf dan angka.</p></div>
+<div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button><button class="btn btn-primary">Buat akun</button></div>
+</form></div></div></div>
+{% endblock %}

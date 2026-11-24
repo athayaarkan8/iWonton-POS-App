@@ -1,0 +1,13 @@
+{% extends "base.html" %}{% block title %}{{ order.order_number }} · Wonton POS{% endblock %}{% block content %}
+<div class="page-heading"><div><p class="eyebrow">ADMIN · DETAIL TRANSAKSI</p><h1 class="page-title">Detail Transaksi</h1></div><a class="btn btn-outline-danger" href="{{ url_for('reports.transactions') }}">← Riwayat Transaksi</a></div>
+<div class="receipt mx-auto">
+<div class="text-center"><div class="fw-bold fs-5 brand">♡ Wonton POS</div><div class="small text-muted">Struk transaksi</div></div><hr class="receipt-line">
+<div class="receipt-row"><span>No. order</span><b>{{ order.order_number }}</b></div>
+<div class="receipt-row"><span>Tanggal</span><span>{{ order.created_at|wib('%d/%m/%Y %H:%M') }} WIB</span></div>
+<div class="receipt-row"><span>Kasir</span><span>{{ order.cashier.display_name }}</span></div>
+<div class="receipt-row"><span>Status</span><span class="badge {{ STATUS_BADGES.get(order.status,'bg-light text-dark') }}">{{ STATUS_LABELS.get(order.status,order.status) }}</span></div><hr class="receipt-line">
+{% for i in order.items %}<div class="mb-2"><div class="receipt-row"><b>{{ i.menu_name }}</b><b>{{ (i.unit_price*i.quantity)|rupiah }}</b></div><div class="small text-muted">{{ i.quantity }} × {{ i.unit_price|rupiah }}</div>{% if i.item_note %}<div class="item-note">✎ {{ i.item_note }}</div>{% endif %}</div>{% endfor %}<hr class="receipt-line">
+<div class="receipt-row fs-5"><b>TOTAL</b><b class="brand">{{ order.total|rupiah }}</b></div>
+{% if order.status!='completed' %}<div class="small text-muted mt-1">Transaksi ini belum/tidak dihitung sebagai omzet.</div>{% endif %}
+{% if order.customer_note %}<div class="customer-note mt-3"><b>Catatan pesanan:</b> {{ order.customer_note }}</div>{% endif %}</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+{% extends "base.html" %}{% block title %}Kasir · Wonton POS{% endblock %}{% block content %}
+<div class="page-heading"><div><p class="eyebrow">POINT OF SALE</p><h1 class="page-title">Kasir</h1><p class="text-muted">Pilih menu, tentukan jumlah, lalu kirim pesanan ke antrean produksi.</p></div><span class="role-pill"><i class="bi bi-lightning-charge-fill me-1"></i> Order entry</span></div>
+<form method="POST" action="{{url_for('cashier.create_order')}}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="row g-4 cashier-layout align-items-start">
+    <div class="col-lg-8">
+      <div class="cashier-toolbar mb-3"><div class="input-group"><span class="input-group-text"><i class="bi bi-search"></i></span><input id="menuSearch" class="form-control" type="search" placeholder="Cari menu..." aria-label="Cari menu"></div><span class="small text-muted">Stok diperbarui otomatis</span></div>
+      <div class="row g-3" id="cashierMenuGrid">{% for m in menus %}<div class="col-md-6 col-xl-6 menu-option" data-menu-name="{{ m.name|lower }}"><div class="menu-card cashier-menu"><div class="d-flex justify-content-between align-items-start gap-2"><h5>{{m.name}}</h5>{% if available[m.id]<=m.minimum_stock %}<span class="badge bg-warning-subtle text-warning-emphasis">Stok rendah</span>{% endif %}</div><div class="price-text">Rp {{ "{:,.0f}".format(m.price).replace(",",".") }}</div><div class="small text-muted mb-3">Tersedia: <strong id="available-{{m.id}}">{{available[m.id]}}</strong> porsi <span class="stock-live small text-success" id="stock-live-{{m.id}}">● live</span></div><label class="form-label">Jumlah</label><input class="form-control qty-input" type="number" min="0" max="{{available[m.id]}}" value="0" name="qty_{{m.id}}" data-price="{{m.price}}" {% if available[m.id]==0 %}disabled{% endif %}><label class="form-label mt-2">Catatan</label><input class="form-control" name="note_{{m.id}}" placeholder="Pedas, pedas sedikit, dll."></div></div>{% else %}<div class="col-12"><div class="empty-state">Belum ada menu aktif. Admin harus menambahkan menu dahulu.</div></div>{% endfor %}</div>
+    </div>
+    <div class="col-lg-4">
+      <aside class="checkout-panel" aria-label="Ringkasan pesanan">
+        <div class="checkout-panel-heading"><span class="eyebrow mb-1">ORDER SUMMARY</span><h5 class="mb-0">Ringkasan pesanan</h5></div>
+        <div class="small text-muted mt-3">Estimasi total</div><div class="checkout-total" id="total">Rp 0</div>
+        <div class="checkout-divider"></div>
+        <label class="form-label small mb-1" for="customerNote">Catatan pesanan (opsional)</label><input id="customerNote" class="form-control" name="customer_note" placeholder="Contoh: dibungkus terpisah">
+        <button class="btn btn-primary btn-lg w-100 mt-3" {% if not menus %}disabled{% endif %}>Kirim ke Produksi <i class="bi bi-arrow-right ms-1"></i></button>
+        <p class="checkout-hint mb-0 mt-3"><i class="bi bi-info-circle me-1"></i>Stok akan direservasi setelah pesanan dikirim.</p>
+      </aside>
+    </div>
+  </div>
+</form>
+<section class="mt-5"><div class="d-flex justify-content-between align-items-center mb-3"><h4>Pesanan terbaru</h4><span class="text-muted small">30 order terakhir</span></div><div class="row g-3">{% for o in orders %}<div class="col-lg-6"><div class="order-mini"><div class="d-flex justify-content-between"><strong>{{o.order_number}}</strong><span class="badge {{'bg-warning-subtle text-warning-emphasis' if o.status=='pending' else 'bg-info-subtle text-info-emphasis' if o.status=='preparing' else 'bg-success-subtle text-success' if o.status=='completed' else 'bg-secondary-subtle text-secondary'}}">{{ {'pending':'Menunggu','preparing':'Diproses','completed':'Selesai','cancelled':'Dibatalkan'}.get(o.status,o.status) }}</span></div><div class="small text-muted">{{o.created_at.strftime('%H:%M · %d/%m')}} · {{o.cashier.display_name}}</div><ul class="small mt-2 mb-2">{% for item in o.items %}<li>{{item.quantity}}× {{item.menu_name}}{% if item.item_note %} — {{item.item_note}}{% endif %}</li>{% endfor %}</ul><div class="d-flex justify-content-between align-items-center"><b>Rp {{ "{:,.0f}".format(o.total).replace(",",".") }}</b>{% if o.status=='pending' %}<form method="POST" action="{{url_for('cashier.cancel_order',order_id=o.id)}}" onsubmit="return confirm('Batalkan pesanan ini? Reservasi stok dilepas.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-sm btn-outline-danger">Batalkan</button></form>{% endif %}</div></div></div>{% else %}<div class="text-muted">Belum ada order hari ini.</div>{% endfor %}</div></section>
+<script>
+const inputs=[...document.querySelectorAll('.qty-input')];
+const fmt=n=>'Rp '+n.toLocaleString('id-ID');
+function update(){let sum=0;inputs.forEach(i=>{sum+=Math.max(0,Number(i.value||0))*Number(i.dataset.price||0)});document.getElementById('total').textContent=fmt(sum)}
+inputs.forEach(i=>i.addEventListener('input',update));update();
+const menuSearch=document.getElementById('menuSearch');
+menuSearch?.addEventListener('input',()=>{const q=menuSearch.value.trim().toLowerCase();document.querySelectorAll('.menu-option').forEach(card=>{card.hidden=!card.dataset.menuName.includes(q)});});
+// Poll stok/reservasi tanpa reload, supaya jumlah pesanan yang sedang diisi tidak hilang.
+async function refreshAvailability(){
+  try{
+    const response=await fetch("{{ url_for('cashier.availability') }}",{cache:"no-store"});
+    if(!response.ok) return;
+    const latest=await response.json();
+    Object.entries(latest).forEach(([id,qty])=>{
+      const label=document.getElementById('available-'+id);
+      const input=document.querySelector(`[name="qty_${id}"]`);
+      const live=document.getElementById('stock-live-'+id);
+      if(!label || !input) return;
+      label.textContent=qty;
+      input.max=qty;
+      input.disabled=qty===0;
+      if(Number(input.value)>qty){
+        live.textContent='● jumlah melebihi stok terbaru';
+        live.className='stock-live small text-danger';
+      }else{
+        live.textContent='● live';
+        live.className='stock-live small text-success';
+      }
+    });
+  }catch(error){ /* Stok terakhir yang berhasil dimuat tetap ditampilkan. */ }
+}
+refreshAvailability();
+setInterval(refreshAvailability,5000);
+</script>
+{% endblock %}

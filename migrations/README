@@ -1,0 +1,12 @@
+Wonton POS database migrations
+
+For a new database or existing Stage 7 database, run:
+    flask --app run:app db upgrade
+
+The baseline creates only missing tables and preserves existing tables/data.
+For later schema changes:
+    flask --app run:app db migrate -m "describe schema change"
+    flask --app run:app db upgrade
+
+Review generated migrations and back up production before applying them.
+Never use db.drop_all() on production.

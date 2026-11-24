@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Produksi · Wonton POS{% endblock %}
+{% block content %}
+<div class="page-heading">
+  <div><p class="eyebrow">KITCHEN DISPLAY SYSTEM</p><h1 class="page-title">Antrean Produksi</h1>
+  <p class="text-muted mb-0">Pesanan paling lama tampil lebih dahulu. Halaman diperbarui otomatis setiap 10 detik.</p></div>
+  <a class="btn btn-outline-danger" href="{{ url_for('main.dashboard') }}">← Dashboard</a>
+</div>
+<div class="row g-3 kds-board">
+  <section class="col-xl-4 kds-column">
+    <div class="kitchen-column">
+      <div class="kitchen-column-head"><div><span class="kitchen-dot waiting-dot"></span><strong>Menunggu</strong></div><span class="kitchen-count">{{ waiting|length }}</span></div>
+      {% for o in waiting %}
+      <article class="kitchen-card">
+        <div class="d-flex justify-content-between align-items-start"><div><span class="order-number">{{ o.order_number }}</span><div class="small text-muted">{{ o.created_at.strftime('%H:%M · %d/%m/%Y') }}</div></div><span class="badge bg-warning-subtle text-warning-emphasis">Baru masuk</span></div>
+        <ul class="kitchen-items">{% for item in o.items %}<li><div><strong>{{ item.quantity }}× {{ item.menu_name }}</strong>{% if item.item_note %}<div class="item-note">✎ {{ item.item_note }}</div>{% endif %}</div></li>{% endfor %}</ul>
+        {% if o.customer_note %}<div class="customer-note"><b>Catatan order:</b> {{ o.customer_note }}</div>{% endif %}
+        <div class="kitchen-card-footer"><span class="small text-muted">Kasir: {{ o.cashier.display_name }}</span><form method="POST" action="{{ url_for('production.start_order', order_id=o.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-primary">Mulai Masak <i class="bi bi-arrow-right ms-1"></i></button></form></div>
+      </article>
+      {% else %}<div class="kitchen-empty"><i class="bi bi-check2-circle fs-4 d-block mb-2"></i><strong>Belum ada antrean baru</strong><p class="small mb-0">Pesanan dari kasir akan muncul di sini.</p></div>{% endfor %}
+    </div>
+  </section>
+  <section class="col-xl-4 kds-column">
+    <div class="kitchen-column">
+      <div class="kitchen-column-head"><div><span class="kitchen-dot preparing-dot"></span><strong>Sedang Dibuat</strong></div><span class="kitchen-count">{{ preparing|length }}</span></div>
+      {% for o in preparing %}
+      <article class="kitchen-card preparing-card">
+        <div class="d-flex justify-content-between align-items-start"><div><span class="order-number">{{ o.order_number }}</span><div class="small text-muted">{{ o.created_at.strftime('%H:%M · %d/%m/%Y') }}</div></div><span class="badge bg-info-subtle text-info-emphasis">Dimasak</span></div>
+        <ul class="kitchen-items">{% for item in o.items %}<li><div><strong>{{ item.quantity }}× {{ item.menu_name }}</strong>{% if item.item_note %}<div class="item-note">✎ {{ item.item_note }}</div>{% endif %}</div></li>{% endfor %}</ul>
+        {% if o.customer_note %}<div class="customer-note"><b>Catatan order:</b> {{ o.customer_note }}</div>{% endif %}
+        <div class="kitchen-card-footer"><span class="small text-muted">Kasir: {{ o.cashier.display_name }}</span><form method="POST" action="{{ url_for('production.complete_order', order_id=o.id) }}" onsubmit="return confirm('Tandai pesanan ini selesai? Stok fisik akan dikurangi.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn-success"><i class="bi bi-check2 me-1"></i>Selesai</button></form></div>
+      </article>
+      {% else %}<div class="kitchen-empty"><i class="bi bi-egg-fried fs-4 d-block mb-2"></i><strong>Belum ada yang dimasak</strong><p class="small mb-0">Tekan Mulai Masak pada pesanan baru.</p></div>{% endfor %}
+    </div>
+  </section>
+  <section class="col-xl-4 kds-column">
+    <div class="kitchen-column">
+      <div class="kitchen-column-head"><div><span class="kitchen-dot completed-dot"></span><strong>Pesanan Selesai</strong></div><span class="kitchen-count">{{ completed|length }}</span></div>
+      {% for o in completed %}
+      <article class="kitchen-card completed-card">
+        <div class="d-flex justify-content-between"><strong class="order-number">{{ o.order_number }}</strong><span class="badge bg-success-subtle text-success">Selesai</span></div>
+        <ul class="kitchen-items compact-items">{% for item in o.items %}<li><strong>{{ item.quantity }}× {{ item.menu_name }}</strong>{% if item.item_note %}<span class="item-note"> · {{ item.item_note }}</span>{% endif %}</li>{% endfor %}</ul>
+        <div class="small text-muted">Dibuat {{ o.created_at.strftime('%H:%M · %d/%m/%Y') }} · {{ o.cashier.display_name }}</div>
+      </article>
+      {% else %}<div class="kitchen-empty">Riwayat pesanan selesai akan tampil di sini.</div>{% endfor %}
+      {% if completed %}<p class="small text-muted text-center mt-2">Menampilkan maksimal 30 pesanan terbaru.</p>{% endif %}
+    </div>
+  </section>
+</div>
+<script>setTimeout(() => window.location.reload(), 10000);</script>
+{% endblock %}

@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#faf8f7">
+  <title>{% block title %}Wonton POS{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+  <link href="{{ url_for('static',filename='css/style.css') }}" rel="stylesheet">
+</head>
+<body class="{% if current_user.is_authenticated %}app-body{% else %}auth-body{% endif %}">
+{% macro nav_link(endpoint, label, icon, endpoints=[]) -%}
+<a class="side-link {% if request.endpoint == endpoint or request.endpoint in endpoints %}active{% endif %}" href="{{ url_for(endpoint) }}">
+  <i class="bi {{ icon }}" aria-hidden="true"></i><span>{{ label }}</span>
+</a>
+{%- endmacro %}
+{% macro sidebar_content() -%}
+  <a class="sidebar-brand" href="{{ url_for('main.dashboard') }}">
+    <span class="brand-symbol"><i class="bi bi-heart-fill" aria-hidden="true"></i></span>
+    <span><strong>Wonton POS</strong><small>OPERATIONS WORKSPACE</small></span>
+  </a>
+  <div class="sidebar-section-label">WORKSPACE</div>
+  {{ nav_link('main.dashboard','Dashboard','bi-grid-1x2-fill') }}
+  {% if current_user.role in ['admin','kasir'] %}{{ nav_link('cashier.index','Kasir','bi-basket2-fill') }}{% endif %}
+  {% if current_user.role in ['admin','produksi'] %}{{ nav_link('production.index','Kitchen / Production','bi-fire') }}{% endif %}
+  {% if current_user.role == 'admin' %}
+    <div class="sidebar-section-label mt-4">MANAJEMEN</div>
+    {{ nav_link('inventory.menus','Menu','bi-journal-richtext') }}
+    {{ nav_link('inventory.stock','Inventory & Stok','bi-box-seam') }}
+    {{ nav_link('inventory.history','Riwayat Stok','bi-clock-history') }}
+    <div class="sidebar-section-label mt-4">ANALISIS</div>
+    {{ nav_link('reports.transactions','Riwayat Transaksi','bi-receipt') }}
+    {{ nav_link('reports.reports','Analytics & Reports','bi-graph-up-arrow') }}
+    <div class="sidebar-section-label mt-4">PENGATURAN</div>
+    {{ nav_link('users.index','Manajemen Pengguna','bi-people-fill') }}
+  {% endif %}
+  <div class="sidebar-user">
+    <div class="user-avatar">{{ current_user.display_name[:1]|upper }}</div>
+    <div class="user-meta"><strong>{{ current_user.display_name }}</strong><small>{{ current_user.role|title }}</small></div>
+    <form method="POST" action="{{ url_for('auth.logout') }}" class="d-inline"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="logout-icon" type="submit" title="Logout" aria-label="Logout"><i class="bi bi-box-arrow-right"></i></button></form>
+  </div>
+{%- endmacro %}
+{% if current_user.is_authenticated %}
+  <aside class="app-sidebar d-none d-lg-flex" aria-label="Navigasi utama">{{ sidebar_content() }}</aside>
+  <header class="mobile-topbar d-lg-none">
+    <button class="mobile-menu-button" type="button" data-bs-toggle="offcanvas" data-bs-target="#mobileNav" aria-controls="mobileNav" aria-label="Buka navigasi"><i class="bi bi-list"></i></button>
+    <a class="mobile-brand" href="{{ url_for('main.dashboard') }}"><span class="brand-symbol"><i class="bi bi-heart-fill"></i></span> Wonton POS</a>
+    <span class="mobile-user-avatar" title="{{ current_user.display_name }}">{{ current_user.display_name[:1]|upper }}</span>
+  </header>
+  <div class="offcanvas offcanvas-start mobile-sidebar d-lg-none" tabindex="-1" id="mobileNav" aria-labelledby="mobileNavLabel">
+    <div class="offcanvas-header"><h5 class="offcanvas-title" id="mobileNavLabel">Navigasi</h5><button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Tutup"></button></div>
+    <div class="offcanvas-body">{{ sidebar_content() }}</div>
+  </div>
+  <div class="app-main">
+    <header class="topbar d-none d-lg-flex">
+      <div><span class="topbar-kicker">WONTON POS</span><strong>{% if request.endpoint == 'main.dashboard' %}Workspace{% elif request.endpoint == 'cashier.index' %}Point of Sale{% elif request.endpoint == 'production.index' %}Kitchen Display{% elif request.endpoint and request.endpoint.startswith('inventory.') %}Menu & Inventory{% elif request.endpoint and request.endpoint.startswith('reports.') %}Transactions & Reports{% elif request.endpoint and request.endpoint.startswith('users.') %}User Administration{% else %}Operations{% endif %}</strong></div>
+      <div class="topbar-user"><span class="topbar-status"></span><span>{{ current_user.display_name }}</span><span class="topbar-role">{{ current_user.role|title }}</span></div>
+    </header>
+    <main class="page-content">
+{% else %}
+  <main class="auth-main">
+{% endif %}
+  {% with messages=get_flashed_messages(with_categories=true) %}
+    {% if messages %}<div class="flash-stack" aria-live="polite">{% for category,message in messages %}<div class="alert alert-{{ category }} alert-dismissible fade show" role="alert"><span>{{ message }}</span><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Tutup"></button></div>{% endfor %}</div>{% endif %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+{% if current_user.is_authenticated %}
+    </main>
+    <footer class="app-footer"><span>Wonton POS</span><span>Operational workspace</span></footer>
+  </div>
+{% else %}
+  </main>
+{% endif %}
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// Close the mobile navigation after selecting a destination.
+document.querySelectorAll('#mobileNav .side-link').forEach(link => link.addEventListener('click', () => {
+  const drawer = document.getElementById('mobileNav');
+  if (drawer && window.bootstrap) bootstrap.Offcanvas.getInstance(drawer)?.hide();
+}));
+// Prevent accidental double submission on forms with an explicit submit button.
+document.querySelectorAll('form').forEach(form => form.addEventListener('submit', event => {
+  if (form.dataset.allowRepeat === 'true') return;
+  const submit = form.querySelector('button[type="submit"],button:not([type])');
+  if (submit && !form.checkValidity()) return;
+  if (submit && !submit.disabled) {
+    submit.dataset.originalText = submit.innerHTML;
+    submit.disabled = true;
+    submit.classList.add('is-submitting');
+    submit.setAttribute('aria-busy', 'true');
+  }
+}));
+</script>
+{% block scripts %}{% endblock %}
+</body></html>
